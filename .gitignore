@@ -1,0 +1,16 @@
+# LaTeX build
+*.aux
+*.log
+*.out
+*.toc
+*.synctex.gz
+*.fls
+*.fdb_latexmk
+*.bbl
+*.blg
+# env/caches
+__pycache__/
+*.pyc
+venv/
+node_modules/
+.DS_Store

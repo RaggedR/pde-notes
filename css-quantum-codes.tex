@@ -1,0 +1,370 @@
+\documentclass[11pt,a4paper]{article}
+\usepackage[margin=2.5cm]{geometry}
+\usepackage{amsmath,amssymb,amsthm}
+\usepackage{xcolor}
+\usepackage{booktabs}
+\usepackage{enumitem}
+\usepackage{hyperref}
+\hypersetup{colorlinks=true, linkcolor=blue!60!black, urlcolor=blue!60!black, citecolor=blue!60!black}
+
+\usepackage{titlesec}
+\titleformat{\section}{\large\bfseries}{\thesection.}{0.5em}{}
+\titleformat{\subsection}{\normalsize\bfseries}{\thesubsection.}{0.5em}{}
+
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{6pt}
+
+\newtheorem{theorem}{Theorem}
+\newtheorem{proposition}[theorem]{Proposition}
+\newtheorem{lemma}[theorem]{Lemma}
+\newtheorem{remark}[theorem]{Remark}
+
+\newcommand{\FF}{\mathbb{F}_2}
+
+\title{\textbf{CSS Quantum Codes from Surface Tilings}\\[4pt]
+\large A Lean~4 Formalisation}
+\author{Robin Langer}
+\date{}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+A tiling of a closed orientable surface of genus~$g$ by polygons gives a
+CSS (Calderbank--Shor--Steane) quantum error-correcting code whose physical
+qubits correspond to edges, $X$-stabilizers to vertices, and $Z$-stabilizers
+to faces. The number of logical qubits is $k = 2g$, the first Betti number
+of the surface. We give a self-contained proof and describe a complete
+formalisation in Lean~4 (sorry-free for the core pipeline), with concrete
+instances including the Heawood graph on the torus ($g=1$, $k=2$), the
+M\"obius--Kantor graph on the Bolza surface ($g=2$, $k=4$), the Klein
+quartic ($g=3$, $k=6$), and the Clayworth graph from the exceptional Lie
+group $G_2(2)$ on a surface of genus~505 ($k=1010$).
+\end{abstract}
+
+
+\section{Introduction}
+
+A CSS quantum code~\cite{calderbank_shor1996,steane1996} is specified by two
+binary parity-check matrices $H_X$ and $H_Z$ satisfying $H_X H_Z^\top = 0$.
+Rows of $H_X$ generate the $X$-stabilizers; rows of $H_Z$ generate the
+$Z$-stabilizers. The code encodes
+\[
+  k = n - \operatorname{rank}(H_X) - \operatorname{rank}(H_Z)
+\]
+logical qubits into $n$ physical qubits.
+
+Homological quantum codes~\cite{breuckmann_terhal2017} construct $H_X$ and
+$H_Z$ from a chain complex. The simplest instance: tile a closed orientable
+surface of genus~$g$ by polygons, form the cellular chain complex
+\[
+  C_2 \xrightarrow{\;\partial_2\;} C_1 \xrightarrow{\;\partial_1\;} C_0
+\]
+over $\FF$, set $H_X = \partial_1$ (vertex--edge incidence) and
+$H_Z = \partial_2^\top$ (face--edge incidence). The chain complex condition
+$\partial_1 \circ \partial_2 = 0$ gives the CSS orthogonality
+$H_X H_Z^\top = 0$, and Euler's formula forces
+$k = 2g$.
+
+This note gives a self-contained account of this construction and its
+formalisation in Lean~4. The connection to the broader programme linking
+spectral theory, sheaf cohomology, and LLM
+interpretability~\cite{langer2026llm,langer2026hurwitz} is discussed in
+Section~\ref{sec:connection}.
+
+
+\section{The construction}
+
+\subsection{Surface tilings and boundary operators}
+
+A \emph{surface tiling} is a 2-cell embedding of a graph on a closed
+orientable surface: vertices (0-cells), edges (1-cells), and faces (2-cells),
+where each face boundary is a closed directed trail in the graph. Let $V$,
+$E$, $F$ denote the numbers of vertices, edges, and faces.
+
+The \emph{boundary operators} over $\FF$ are:
+\begin{itemize}[leftmargin=*]
+\item $\partial_1 \in \FF^{V \times E}$: the vertex--edge incidence matrix.
+  Entry $\partial_1(v,e) = 1$ if $v$ is an endpoint of~$e$, else~$0$.
+  (Over $\FF$, loops would give $1 + 1 = 0$; we exclude loops.)
+\item $\partial_2 \in \FF^{E \times F}$: the edge--face boundary matrix.
+  Entry $\partial_2(e,f) = 1$ if edge~$e$ appears in the boundary walk of
+  face~$f$, else~$0$. (Faces are trails, so each edge appears at most once
+  per face.)
+\end{itemize}
+
+\subsection{The chain complex condition: $\partial_1 \circ \partial_2 = 0$}
+
+\begin{proposition}\label{prop:d2}
+For any surface tiling, $\partial_1 \cdot \partial_2 = 0$ over~$\FF$.
+\end{proposition}
+
+\begin{proof}
+Fix a vertex~$v$ and a face~$f$ with boundary walk
+$e_0, e_1, \ldots, e_{r-1}$. Each step $i$ of the walk starts at some vertex
+and ends at another. The closed walk condition says that
+$\operatorname{end}(i) = \operatorname{start}(i{+}1 \bmod r)$.
+
+The product $(\partial_1 \cdot \partial_2)(v, f) = \sum_i \partial_1(v, e_i)$.
+Now $\partial_1(v, e_i) = [\operatorname{start}(i) = v] +
+[\operatorname{end}(i) = v]$ regardless of traversal direction (addition is
+commutative). Split the sum:
+\[
+  \sum_i [\operatorname{start}(i) = v] + \sum_i [\operatorname{end}(i) = v].
+\]
+By the closed walk condition plus the fact that cyclic rotation
+$i \mapsto i{+}1 \bmod r$ is a bijection on $\{0, \ldots, r{-}1\}$:
+\[
+  \sum_i [\operatorname{end}(i) = v]
+  = \sum_i [\operatorname{start}(i{+}1 \bmod r) = v]
+  = \sum_i [\operatorname{start}(i) = v].
+\]
+Therefore $(\partial_1 \cdot \partial_2)(v,f) = 2 \sum_i
+[\operatorname{start}(i) = v] = 0$ in $\FF$.
+\end{proof}
+
+
+\section{The main theorem: $k = 2g$}
+
+\begin{theorem}\label{thm:main}
+Let $T$ be a surface tiling of a closed orientable surface of genus~$g$
+with $V$~vertices, $E$~edges, and $F$~faces. Set $H_X = \partial_1$ and
+$H_Z = \partial_2^\top$. If the primal graph is connected and the dual
+graph is connected (equivalently, each edge borders exactly two distinct
+faces), then the resulting CSS code encodes exactly $k = 2g$ logical qubits.
+\end{theorem}
+
+The proof has two ingredients: rank computations and Euler's formula.
+
+\subsection{Rank of $\partial_1$: the kernel characterisation}
+
+\begin{lemma}\label{lem:rank_d1}
+If the primal graph is connected and $V \geq 2$, then
+$\operatorname{rank}(\partial_1) = V - 1$.
+\end{lemma}
+
+\begin{proof}
+\emph{Upper bound.} Each column of $\partial_1$ has exactly two nonzero
+entries (the two endpoints), so each column sums to $1 + 1 = 0$ in~$\FF$.
+Therefore the all-ones vector $\mathbf{1}_V$ lies in
+$\ker(\partial_1^\top)$, giving
+$\dim \ker(\partial_1^\top) \geq 1$, hence
+$\operatorname{rank}(\partial_1) \leq V - 1$ by rank--nullity.
+
+\emph{Lower bound.} We show $\ker(\partial_1^\top) = \operatorname{span}\{\mathbf{1}_V\}$.
+Let $x \in \ker(\partial_1^\top)$. Then for every edge~$e$ with endpoints
+$u, v$:
+\[
+  (\partial_1^\top x)(e) = x(u) + x(v) = 0 \;\Longrightarrow\; x(u) = x(v).
+\]
+By connectivity, for any two vertices $u, w$ there is a walk $u = v_0,
+v_1, \ldots, v_\ell = w$, and the equation propagates:
+$x(u) = x(v_1) = \cdots = x(w)$. So $x$ is constant on all vertices.
+Over~$\FF$, constant means $x = 0$ or $x = \mathbf{1}_V$, so
+$\ker(\partial_1^\top) = \operatorname{span}\{\mathbf{1}_V\}$ has
+dimension~1. Rank--nullity gives $\operatorname{rank}(\partial_1) = V - 1$.
+\end{proof}
+
+\subsection{Rank of $\partial_2$: the dual kernel characterisation}
+
+\begin{lemma}\label{lem:rank_d2}
+If each edge borders exactly two faces and the dual graph is connected with
+$F \geq 2$, then $\operatorname{rank}(\partial_2) = F - 1$.
+\end{lemma}
+
+\begin{proof}
+The argument mirrors Lemma~\ref{lem:rank_d1}. The two-sides hypothesis
+implies $\partial_2 \cdot \mathbf{1}_F = 0$ (each row of $\partial_2$ has
+exactly two nonzero entries), giving the upper bound. For the lower bound:
+if $y \in \ker(\partial_2)$, then for each edge~$e$ bordering faces
+$f_1, f_2$, we get $y(f_1) + y(f_2) = 0$, i.e., $y(f_1) = y(f_2)$.
+Dual connectivity propagates this to all faces, so
+$\ker(\partial_2) = \operatorname{span}\{\mathbf{1}_F\}$.
+\end{proof}
+
+\subsection{Euler arithmetic}
+
+\begin{proof}[Proof of Theorem~\ref{thm:main}]
+By Lemmas~\ref{lem:rank_d1} and~\ref{lem:rank_d2}:
+\begin{align*}
+  k &= E - \operatorname{rank}(H_X) - \operatorname{rank}(H_Z) \\
+    &= E - (V - 1) - (F - 1) \\
+    &= E - V - F + 2 \\
+    &= 2g,
+\end{align*}
+where the last step uses Euler's formula $V - E + F = 2 - 2g$ for a closed
+orientable surface of genus~$g$.
+\end{proof}
+
+
+\section{Concrete instances}\label{sec:instances}
+
+Every surface tiling from a triangle group $\Delta(2,3,r)$ acting on a finite
+group~$G$ gives an instance. The construction
+(formalised in \texttt{TriangleGroupSurface.lean}) uses
+the Sabidussi coset representation~\cite{langer2014}: vertices are cosets
+of $\langle S \rangle$ (order~3), edges are cosets of $\langle T \rangle$
+(order~2, where $T = RS$), and faces are cosets of $\langle R \rangle$
+(order~$r$). The genus follows from Euler's formula: $g = 1 - |G|/2 \cdot
+(1/2 + 1/3 + 1/r - 1)$.
+
+\begin{table}[ht]
+\centering\small
+\begin{tabular}{@{}lllcccl@{}}
+\toprule
+Surface & Graph & $G$ & $\Delta$ & $g$ & CSS & Lean \\
+\midrule
+Torus & Heawood & $G_{42}$ & $(2,3,6)$ & 1 & $[\![21,2]\!]$ & sorry-free \\
+Bolza & M\"ob.-Kantor & $\mathrm{GL}(2,3)$ & $(2,3,8)$ & 2 & $[\![24,4]\!]$ & sorry-free \\
+Klein quartic & F056A & $\mathrm{PSL}(2,7)$ & $(2,3,7)$ & 3 & $[\![84,6]\!]$ & 3 data sorry \\
+Clayworth & 4032v & $G_2(2)$ & $(2,3,12)$ & 505 & $[\![6048,1010]\!]$ & rank hyps \\
+\bottomrule
+\end{tabular}
+\caption{CSS codes from triangle group tilings. ``Sorry-free'' means every
+  axiom is verified by the Lean~4 kernel. The Klein quartic has 3 data
+  sorrys (verified in GAP). The Clayworth code has rank hypotheses verified
+  by Gaussian elimination over $\FF$ in Python.}
+\label{tab:instances}
+\end{table}
+
+The Heawood graph is the Levi graph (incidence graph) of the Fano plane
+$\mathrm{PG}(2,2)$, embedded on the torus with 7~hexagonal faces in the
+$\{6,3\}$ tiling.
+
+The M\"obius--Kantor graph $\mathrm{GP}(8,3)$ (the generalised Petersen
+graph) embeds on the Bolza surface---the most symmetric genus-2
+surface---with 6~octagonal faces in the $\{8,3\}$ tiling.
+
+The Klein quartic has the maximum number of automorphisms for genus~3
+(Hurwitz bound: $|\mathrm{Aut}| = 168 = 84(g-1)$). Its $\{7,3\}$ tiling
+gives 24~heptagonal faces.
+
+The Clayworth graph, constructed from the exceptional Lie group $G_2(2)$
+(order 12096), gives the largest code in this family: 6048 physical qubits
+encoding 1010 logical qubits on a surface of genus~505.
+
+\begin{remark}
+Not every Sabidussi graph admits a tiling. The Zhou graph
+$\mathrm{Sab}(\mathrm{PSL}(2,13), S_3)$ (Foster census F182A, 182
+vertices) does not arise from a triangle group of the form $\Delta(2,3,r)$
+and does not tile a surface in this way.
+\end{remark}
+
+
+\section{The Lean formalisation}\label{sec:lean}
+
+The formalisation consists of the following files, building a
+sorry-free proof chain for the core theorem:
+
+\begin{enumerate}[leftmargin=*]
+\item \textbf{\texttt{Basic.lean}} --- defines \texttt{BinaryLinearCode}
+  (a parity-check matrix over~$\FF$ and its kernel as code space) and
+  proves $\dim = n - \operatorname{rank}(H)$ via rank--nullity.
+
+\item \textbf{\texttt{CSSCode.lean}} --- defines \texttt{SurfaceTiling}
+  ($V$, $E$, $F$, $g$ with Euler's formula as an axiom) and
+  \texttt{CSSFromTiling} ($H_X$, $H_Z$ with the orthogonality condition
+  $H_X H_Z^\top = 0$). States and proves \texttt{css\_k\_eq\_2g}: given rank
+  hypotheses, $k = 2g$ follows by \texttt{linarith} from Euler's formula.
+
+\item \textbf{\texttt{CellularSurface.lean}} --- defines the combinatorial
+  data of a 2-cell embedding: edge endpoints, face boundary walks (as
+  injective sequences of directed edges satisfying a closed walk axiom),
+  boundary operators $\partial_1$ and $\partial_2$ as matrices over~$\FF$.
+  \textbf{Proves} $\partial_1 \cdot \partial_2 = 0$ (sorry-free). The proof
+  follows Proposition~\ref{prop:d2}: reindex via the cyclic bijection, then
+  use $x + x = 0$ in~$\FF$.
+
+\item \textbf{\texttt{IncMatrixRank.lean}} --- proves the rank theorems.
+  Upper bounds via the all-ones kernel vector. Lower bounds via the kernel
+  characterisation: walks in connected graphs propagate equality of kernel
+  elements, forcing $\ker(\partial_1^\top) =
+  \operatorname{span}\{\mathbf{1}_V\}$. The dual argument uses dual
+  adjacency (two faces sharing an edge) and the two-sides hypothesis.
+  \textbf{All sorry-free.}
+
+\item \textbf{\texttt{SurfaceCSS.lean}} --- assembly: constructs
+  \texttt{CSSFromTiling} from a \texttt{CellularSurface}
+  ($H_X = \partial_1$, $H_Z = \partial_2^\top$, orthogonality from
+  $\partial_1 \cdot \partial_2 = 0$) and proves
+  \texttt{css\_k\_eq\_2g\_from\_surface}. Hypotheses: Euler,
+  primal connected, dual connected, two-sides. \textbf{Sorry-free.}
+\end{enumerate}
+
+The triangle group construction (\texttt{TriangleGroupSurface.lean}) provides
+a systematic way to generate concrete instances from finite groups. Darts
+(group elements under the regular representation) are partitioned into
+vertices, edges, and faces via cosets of $\langle S \rangle$,
+$\langle T \rangle$, $\langle R \rangle$ respectively. The closed walk
+axiom follows from $T = RS$ and $S$ preserving vertex cosets:
+$\operatorname{vertex}(T(d)) = \operatorname{vertex}(S(R(d))) =
+\operatorname{vertex}(R(d))$.
+
+
+\section{Connection to spectral theory and sheaf cohomology}
+\label{sec:connection}
+
+The number $2g$ is one object wearing three hats:
+
+\begin{enumerate}[leftmargin=*]
+\item \textbf{Quantum codes.} The number of logical qubits:
+  $k = E - \operatorname{rank}(H_X) - \operatorname{rank}(H_Z) = 2g$,
+  proved in Theorem~\ref{thm:main}.
+
+\item \textbf{Hodge theory.} The space of harmonic 1-forms has
+  dimension $\dim \ker \Delta_1 = 2g$, where $\Delta_1$ is the
+  Laplace--Beltrami operator on 1-forms. By the Hodge theorem,
+  $\ker \Delta_1 \cong H^1(M;\mathbb{R})$.
+
+\item \textbf{Sheaf cohomology.} In a presheaf model of local
+  linearisations (e.g., SAE decompositions of neural network activations),
+  $\dim H^1$ counts the independent obstructions to gluing local
+  descriptions into a global one~\cite{langer2026llm}. The failure to glue
+  is polysemanticity.
+\end{enumerate}
+
+All three are manifestations of the first Betti number
+$\beta_1 = \dim H_1(M; \mathbb{R}) = 2g$, which counts the ``handles'' of
+the surface. The chain complex $\partial^2 = 0$ that gives CSS orthogonality
+is the same chain complex whose homology defines $H_1$; the harmonic forms
+are its Hodge-theoretic shadow; the sheaf $H^1$ is its re-interpretation
+in the language of local-to-global obstructions.
+
+This triangle---codes, spectra, sheaves---is developed further
+in~\cite{langer2026llm,langer2026hurwitz}.
+
+
+\begin{thebibliography}{9}
+\bibitem{calderbank_shor1996}
+A.~R.~Calderbank and P.~W.~Shor.
+Good quantum error-correcting codes exist.
+\emph{Physical Review A}, 54(2):1098--1105, 1996.
+
+\bibitem{steane1996}
+A.~M.~Steane.
+Error correcting codes in quantum theory.
+\emph{Physical Review Letters}, 77(5):793--797, 1996.
+
+\bibitem{breuckmann_terhal2017}
+N.~P.~Breuckmann and B.~M.~Terhal.
+Constructions and noise threshold of hyperbolic surface codes.
+\emph{IEEE Transactions on Information Theory}, 62(6):3731--3744, 2017.
+arXiv:1506.04029.
+
+\bibitem{langer2014}
+R.~Langer.
+\emph{Symmetric graphs and their quotients}.
+PhD thesis, University of Melbourne, 2014. arXiv:1306.4798.
+
+\bibitem{langer2026llm}
+R.~Langer.
+\emph{LLMs as Resonant Structures: From Green's Functions to Nonlinear
+Spectral Theory}. 2026.
+
+\bibitem{langer2026hurwitz}
+R.~Langer.
+\emph{The Laplace--Beltrami Operator on Hurwitz and Hurwitz-like Surfaces:
+Spectral Gaps, Representation Theory, and Topological Constraints}. 2026.
+\end{thebibliography}
+
+\end{document}

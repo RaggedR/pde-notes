@@ -1,0 +1,546 @@
+\documentclass[11pt,a4paper]{article}
+\usepackage[margin=2.5cm]{geometry}
+\usepackage{amsmath,amssymb,amsthm}
+\usepackage{xcolor}
+\usepackage{booktabs}
+\usepackage{enumitem}
+\usepackage{hyperref}
+\hypersetup{colorlinks=true, linkcolor=blue!60!black, urlcolor=blue!60!black, citecolor=blue!60!black}
+
+\usepackage{titlesec}
+\titleformat{\section}{\large\bfseries}{\thesection.}{0.5em}{}
+\titleformat{\subsection}{\normalsize\bfseries}{\thesubsection.}{0.5em}{}
+
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{6pt}
+
+\title{\textbf{LLMs as Resonant Structures}\\[4pt]
+\large From Green's Functions to Nonlinear Spectral Theory}
+\author{Robin Langer}
+\date{}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+We develop a spectral theory of large language models in three layers. First,
+the classical picture: an LLM is a resonant structure whose Green's function
+encodes its natural modes---a prompt excites the structure, and the response is
+determined by the interaction between forcing function and eigenmodes. Second,
+the nonlinear correction: the Inverse Scattering Transform shows that certain
+nonlinear systems are ``secretly linear'' via a nonlinear change of basis, and
+sparse autoencoders (SAEs) perform exactly this role for LLM activations. Third,
+the global obstruction: the local linearisations on competence patches form a
+presheaf on the latent manifold, and polysemanticity is the failure of the
+gluing axiom---measurable by sheaf cohomology. Each level subsumes the last.
+The boundary between ``linear'' and ``nonlinear'' is not a wall. It is a choice
+of basis.
+\end{abstract}
+
+\section{The Punchline}
+
+``Linear'' versus ``nonlinear'' is not a property of the physics. It is a
+property of your coordinate system.
+
+The Korteweg--de Vries equation, governing shallow water waves, looks nonlinear
+in physical coordinates. In scattering-data coordinates, it is as linear as the
+heat equation. The nonlinearity was never in the waves. It was in the description.
+
+The same is true of large language models. An LLM's internal dynamics are
+massively nonlinear---attention, layer normalisation, GeLU activations. But
+sparse autoencoders reveal that the activations decompose into interpretable,
+approximately independent features. In the feature basis, the representation is
+approximately diagonal. The nonlinearity is absorbed into the change of coordinates.
+
+This paper develops the analogy in three stages, each subsuming the last:
+\begin{enumerate}[leftmargin=*]
+  \item \textbf{Green's functions.} A linear spectral decomposition of the LLM
+    as a resonant structure with natural modes. Valid locally, and a good first
+    approximation.
+  \item \textbf{The Inverse Scattering Transform.} A nonlinear spectral theory
+    that explains how SAEs find hidden linearity in a nonlinear system---the same
+    trick that makes solitons ``secretly linear.''
+  \item \textbf{Sheaf structure.} The local linearisations form a presheaf on
+    the latent manifold. Polysemanticity is the failure of the gluing axiom.
+    The first cohomology $H^1$ measures the degree of context-dependence.
+\end{enumerate}
+
+\section{Green's Functions: The Linear Theory}
+
+\subsection{Impulse responses}
+
+Given a linear differential operator $L$ on a domain $\Omega$, the Green's
+function $G(x,y)$ solves
+\[
+  L\, G(\cdot, y) = \delta(y),
+\]
+where $\delta(y)$ is the Dirac delta centred at $y$. This is the system's
+response to a point impulse: strike the drum at exactly one point and observe
+how the entire membrane responds.
+
+The power of the Green's function lies in \emph{superposition}. Any input $f$
+decomposes as $f(x) = \int_\Omega f(y)\,\delta(y)\,dy$, so the solution to
+$Lu = f$ is
+\[
+  u(x) = \int_\Omega G(x,y)\, f(y)\, dy.
+\]
+The operator $L$ is the fixed structure---the drum, the membrane, the resonant
+cavity. The Green's function encodes everything about what that structure
+\emph{can do}. The input $f$ merely selects which modes get excited.
+
+\subsection{Spectral decomposition}
+
+If $L$ has eigenfunctions $\varphi_n$ with eigenvalues $\lambda_n$, then:
+\[
+  G(x,y) = \sum_{n} \frac{\varphi_n(x)\,\varphi_n(y)}{\lambda_n}.
+\]
+Each eigenmode $\varphi_n$ is a natural vibration pattern of the system. A small
+eigenvalue $\lambda_n$ means the corresponding mode resonates strongly---it takes
+little energy to excite it. The input $f = \sum c_n \varphi_n$ simply sets the
+amplitudes: the response is $u = \sum (c_n / \lambda_n)\,\varphi_n$.
+
+\subsection{The LLM as resonant structure}
+
+Calling a large language model a ``next-token predictor'' is technically correct
+and completely beside the point. The training objective (next-token prediction)
+is the \emph{bow}---the mechanism that shaped the instrument during training.
+What emerged is the instrument itself: a resonant structure with natural modes,
+preferred patterns of response, directions in activation space that ring when
+struck.
+
+A prompt does not ``instruct'' the LLM. It \emph{excites} it---a forcing
+function applied to a pre-existing vibrational structure. The response is
+determined by the interaction between the forcing function (prompt) and the
+natural modes (learned representations).
+
+\medskip
+\begin{center}
+\renewcommand{\arraystretch}{1.3}
+\begin{tabular}{@{}ll@{}}
+\toprule
+\textbf{PDE / Green's function} & \textbf{LLM} \\
+\midrule
+Linear operator $L$ & Trained network (weights fixed at inference) \\
+Domain $\Omega$ & Token/embedding space \\
+Green's function $G(x,y)$ & Response map: prompt $\to$ output distribution \\
+Eigenmodes $\varphi_n$ & SAE features / representation directions \\
+Eigenvalues $\lambda_n$ & Feature activation thresholds \\
+Input $f(x)$ & Prompt \\
+Solution $u = G * f$ & Completion \\
+Resonance & Prompt strongly activating a coherent feature \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\medskip
+This picture already illuminates several phenomena. Prompt engineering becomes
+spectral engineering: constructing a forcing function $f$ that excites the right
+modes. Fine-tuning changes $L$ (reshapes the cavity); prompting changes $f$
+(excites it differently). RLHF reshapes the cavity to amplify some modes and
+damp others---the base model and the chat model are different instruments.
+
+This is the linear story. It is correct as far as it goes. But LLMs are not linear.
+
+\section{The Nonlinearity Objection, Taken Seriously}
+
+Green's functions decompose the response into harmonic modes. But purely
+harmonic decompositions have well-known limitations: they struggle with shock
+waves, jets, and sharp impulses. They approximate these phenomena, but there
+are more efficient descriptions. In the language of signal processing, Fourier
+analysis assumes global smoothness that nonlinear systems violate.
+
+The standard response---``the network is locally linear around any operating
+point, so we can compute a local Jacobian''---is true but insufficient. Local
+linearisation is the content of the Hartman--Grobman theorem, and it works near
+equilibria. But the interesting behaviour of LLMs happens far from equilibrium:
+when the model is composing concepts, resolving ambiguity, or navigating between
+incompatible interpretations.
+
+PCA applied to LLM activations is the linear spectral theory---the Green's
+function decomposition. It captures the dominant modes but misses the
+nonlinear interactions between them. Sparse autoencoders outperform PCA
+precisely because they apply a \emph{nonlinear} decomposition that can
+separate features packed into fewer dimensions than there are features.
+
+What we need is not a defence of linearity. We need a nonlinear spectral theory.
+
+\section{Solitons: The Nonlinear Spectral Theory}
+
+\subsection{The Inverse Scattering Transform}
+
+The Korteweg--de Vries (KdV) equation
+\[
+  u_t + 6uu_x + u_{xxx} = 0
+\]
+governs shallow water waves. It is nonlinear (the $uu_x$ term). Its soliton
+solutions---localised waves that propagate without changing shape and survive
+collisions intact---were among the great surprises of 20th-century mathematical
+physics.
+
+The surprise deepened when Gardner, Greene, Kruskal, and Miura discovered
+the Inverse Scattering Transform (IST) in 1967. The IST solves KdV using
+exactly the same pipeline as Green's functions solve linear PDEs:
+
+\medskip
+\begin{center}
+\renewcommand{\arraystretch}{1.3}
+\begin{tabular}{@{}ll@{}}
+\toprule
+\textbf{Linear PDE (heat equation)} & \textbf{Nonlinear PDE (KdV)} \\
+\midrule
+Fourier transform the initial data & Compute scattering data of $u(x,0)$ \\
+Each mode evolves independently & Each piece evolves independently \\
+(multiply by $e^{-k^2 t}$) & (multiply by simple exponentials) \\
+Inverse Fourier transform & Inverse scattering \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\medskip
+The scattering data consists of two parts: a \emph{discrete spectrum} (finitely
+many eigenvalues $\lambda_1, \ldots, \lambda_N$, each with a norming constant
+$c_n$) and a \emph{continuous spectrum} (a reflection coefficient $R(k)$). Each
+discrete eigenvalue corresponds to exactly one soliton. Its eigenvalue determines
+its speed and amplitude. A 3-soliton solution has exactly 3 discrete modes.
+
+The key fact: the eigenvalues do not change under KdV flow. They are conserved
+quantities. Solitons survive collisions not because of some mysterious nonlinear
+balancing act, but because eigenvalues are invariants of the evolution. In
+scattering-data coordinates, KdV is as linear as the heat equation.
+
+The nonlinearity was never in the physics. It was in the choice of coordinates.
+
+\subsection{SAEs as the Inverse Scattering Transform for LLMs}
+
+The analogy between the IST and sparse autoencoders is structural, not
+metaphorical:
+
+\medskip
+\begin{center}
+\renewcommand{\arraystretch}{1.3}
+\begin{tabular}{@{}ll@{}}
+\toprule
+\textbf{IST (soliton theory)} & \textbf{SAE (LLM interpretability)} \\
+\midrule
+Wave profile $u(x)$ & Activation vector in residual stream \\
+Scattering transform & SAE encoder (nonlinear: ReLU) \\
+Discrete eigenvalues (solitons) & Monosemantic features \\
+Continuous spectrum (radiation) & Polysemantic residual \\
+Inverse scattering & SAE decoder \\
+Eigenvalues are invariants & Features persist across layers \\
+Nonlinear PDE (KdV) & Nonlinear transformer computation \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\medskip
+In both cases, the essential move is the same: a nonlinear change of basis that
+reveals hidden linearity. The scattering transform takes a nonlinear wave and
+decomposes it into modes that evolve independently. The SAE encoder takes a
+superposition of entangled features and decomposes it into sparse, approximately
+independent activations.
+
+This explains why SAEs succeed where PCA fails. PCA is the Fourier transform---a
+\emph{linear} change of basis. It works when the modes are orthogonal and the
+dynamics are linear. But the superposition hypothesis tells us that LLMs pack
+more features than dimensions, so features are non-orthogonal. You need a
+\emph{nonlinear} decomposition to untangle them, just as you need the IST
+(not the Fourier transform) to decompose a nonlinear wave.
+
+PCA is the Green's function. SAEs are the Inverse Scattering Transform.
+
+\subsection{The three regimes}
+
+Not all nonlinear systems admit the IST. The ones that do are called
+\emph{integrable}. The analogy extends to a classification:
+
+\medskip
+\begin{center}
+\renewcommand{\arraystretch}{1.3}
+\begin{tabular}{@{}lll@{}}
+\toprule
+\textbf{Regime} & \textbf{PDE analogue} & \textbf{LLM analogue} \\
+\midrule
+Integrable & Solitons (clean discrete spectrum) & Fully monosemantic model \\
+Nearly integrable & Perturbed solitons (slow radiation) & Mostly monosemantic, some polysemantic \\
+Non-integrable & Turbulence (no clean decomposition) & Heavily polysemantic \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\medskip
+Real LLMs sit in the middle row. SAEs work well enough to extract many clean
+features, but the decomposition is never perfect. The residual polysemanticity
+is the continuous spectrum---the radiation that the IST separates from the
+solitons but cannot eliminate.
+
+\section{The Sheaf Structure}
+
+The IST provides a global linearisation when one exists. But what happens when
+the system is only \emph{locally} linearisable---when different regions of input
+space admit different clean decompositions that may be mutually incompatible?
+
+This is the situation for real LLMs, and the right language for it is sheaf theory.
+
+\subsection{The presheaf of local linearisations}
+
+Let $M$ denote the LLM's latent manifold (the space of activation vectors,
+or equivalently, the space of inputs under the embedding map). Give $M$ its
+natural topology: nearby points are inputs that produce similar activations.
+
+Define a presheaf $\mathcal{F}$ on $M$ as follows:
+\begin{itemize}[leftmargin=*]
+  \item To each open set $U \subseteq M$, assign $\mathcal{F}(U)$ = the set of
+    local linearisations on $U$. Concretely, this is a local SAE decomposition:
+    a set of feature directions that cleanly decompose all activations in $U$
+    into sparse, interpretable components.
+  \item For $V \subseteq U$, the restriction map
+    $\mathcal{F}(U) \to \mathcal{F}(V)$ restricts the decomposition to the
+    smaller region. If a linearisation works on $U$, it works on any $V \subseteq U$.
+\end{itemize}
+
+This is always at least a presheaf. The question is whether it satisfies the
+sheaf axioms.
+
+\subsection{Polysemanticity is the failure of gluing}
+
+A sheaf requires two conditions beyond being a presheaf:
+
+\textbf{Locality (separation).} If two local linearisations agree on every
+piece of an open cover, they are the same linearisation. This holds: if two SAE
+decompositions produce identical features on every sub-region, they are the same
+decomposition.
+
+\textbf{Gluing.} If local linearisations on overlapping patches $\{U_i\}$
+agree on all intersections $U_i \cap U_j$, they glue to a global linearisation
+on $\bigcup U_i$. This is where it fails.
+
+A feature that activates as ``financial institution'' on patch $U_1$ (finance
+context) and ``river edge'' on patch $U_2$ (geography context) provides two
+local sections that cannot be glued into a coherent global section. The word
+``bank'' has a clean, monosemantic meaning locally on each patch. But the local
+meanings are incompatible---they do not extend to a global feature.
+
+This is polysemanticity, stated sheaf-theoretically: the presheaf
+$\mathcal{F}$ fails the gluing axiom. Local linearisations exist but are
+globally incompatible.
+
+\subsection{Cohomology measures polysemanticity}
+
+The obstruction to gluing lives in the first \v{C}ech cohomology
+$H^1(M, \mathcal{F})$. This is a standard construction: given an open cover
+$\{U_i\}$ and compatible local sections on each $U_i$, $H^1$ measures
+whether they extend to a global section.
+
+\begin{itemize}[leftmargin=*]
+  \item $H^1 = 0$: every compatible family of local linearisations glues to a
+    global one. The presheaf is a sheaf. The model is globally monosemantic.
+  \item $H^1 \neq 0$: there exist compatible local sections that do not glue.
+    The model has irreducible polysemanticity---context-dependence that cannot
+    be resolved by choosing better features.
+\end{itemize}
+
+The dimension of $H^1$ measures \emph{how polysemantic} the model is: how
+many independent ways the local linearisations can fail to be globally coherent.
+
+\subsection{Holonomy and the Laplace--Beltrami connection}
+
+If we equip $M$ with a Riemannian metric (induced, for instance, by the Fisher
+information of the output distribution), we can study its differential geometry.
+The Laplace--Beltrami operator $\Delta_g$ on $M$ generalises the Laplacian; its
+eigenfunctions are the natural vibration modes of the manifold.
+
+On a flat manifold, these reduce to Fourier modes---the Green's function
+picture. On a curved manifold, they capture the geometry of the representation
+space. Competence at a task corresponds to the manifold being locally flat in
+the relevant region: the eigenfunctions locally look like Fourier modes, and
+the dynamics are locally linear.
+
+The holonomy of the manifold---what happens when you parallel-transport a
+feature vector around a closed loop in input space---measures the global
+curvature. If the holonomy is trivial (the vector returns unchanged), the local
+frames are globally compatible: the presheaf is a sheaf. If the holonomy is
+non-trivial, the vector returns rotated: the same feature means something
+different after traversing a loop through different contexts. This is
+polysemanticity as parallel transport failure.
+
+A training objective that minimises the holonomy of the Laplace--Beltrami
+connection is, in sheaf-theoretic terms, attempting to \emph{sheafify} the
+representation: to make local linearisations globally compatible by flattening
+the manifold via gradient descent.
+
+\subsection{Should we kill $H^1$?}
+
+There is a tension here worth preserving. The superposition hypothesis says that
+LLMs deliberately pack more features than dimensions---features are
+non-orthogonal precisely because this is efficient compression. A perfectly
+sheafified model (one where every local linearisation glues globally) would need
+representations as high-dimensional as the feature space. The polysemanticity
+is not a bug; it is a compression strategy.
+
+The right question may not be ``make $H^1 = 0$'' but rather ``understand $H^1$
+well enough to navigate it.'' Just as an engineer does not need to eliminate
+all nonlinearity from a system---only to understand which nonlinearities matter
+and when---an interpretability researcher does not need to eliminate
+polysemanticity, only to characterise when and how features change meaning
+across contexts.
+
+\section{Case Study: The RSK Transformer}
+
+We now present a concrete case where the spectral theory is directly observable:
+a small transformer trained to invert combinatorial bijections~\cite{rsk-transformer}.
+In the language developed above, this is an \emph{integrable} system---one where
+the presheaf is a sheaf, the decomposition is global, and the full spectral
+structure can be recovered.
+
+\subsection{Setup}
+
+The Robinson--Schensted--Knuth (RSK) correspondence is a fundamental bijection
+in algebraic combinatorics mapping permutations $\sigma \in S_n$ to pairs
+$(P, Q)$ of standard Young tableaux of the same shape. The \emph{RSK transformer}
+is a 1.2M-parameter encoder that learns the inverse: given $(P, Q)$,
+recover~$\sigma$.
+
+The architecture is a 6-layer transformer encoder ($d = 128$, 8 heads) with
+structured 2D token embeddings:
+\[
+  \mathrm{emb}(v, r, c, t) = E_{\mathrm{val}}(v) + E_{\mathrm{row}}(r)
+    + E_{\mathrm{col}}(c) + E_{\mathrm{tab}}(t),
+\]
+where $v$ is the entry value, $(r, c)$ its position in the tableau, and
+$t \in \{P, Q\}$ identifies which tableau it belongs to. The same architecture,
+without modification, also learns the Hillman--Grassl and Burge correspondences.
+
+\subsection{The drum shape: 2D embeddings as domain geometry}
+
+The ablation study reveals a spectral geometry result. The 2D structured
+embeddings define the geometry of the domain $\Omega$---the shape of the drum:
+
+\medskip
+\begin{center}
+\renewcommand{\arraystretch}{1.3}
+\begin{tabular}{@{}lrl@{}}
+\toprule
+\textbf{Embedding structure} & \textbf{Accuracy} & \textbf{Spectral interpretation} \\
+\midrule
+Full 2D (row + col + tableau) & 100\% & Correct drum shape $\Rightarrow$ correct eigenmodes \\
+1D sequential position & 72\% & Wrong geometry $\Rightarrow$ wrong modes, some survive \\
+No tableau identity ($P$ vs $Q$) & 6\% & Domain halved $\Rightarrow$ lost half the spectrum \\
+No spatial information & 0\% & No domain $\Rightarrow$ no modes $\Rightarrow$ no response \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\medskip
+This is a direct analogue of Kac's question ``Can one hear the shape of a
+drum?''~\cite{kac1966}. Removing the 2D structure changes the drum from a
+two-dimensional membrane to a one-dimensional string: some modes survive (72\%),
+but those encoding the 2D tableau geometry are destroyed. Removing the
+$P$-vs-$Q$ identity glues two drums together, making the network unable to
+distinguish which half is vibrating.
+
+\subsection{SAE features as eigenmodes}
+
+Sparse autoencoder analysis reveals interpretable features corresponding
+precisely to the natural modes $\varphi_n$:
+
+\begin{itemize}[leftmargin=*]
+  \item \textbf{Insertion-order detectors}---temporal eigenmodes that activate
+    when the network recognises which step of the RSK algorithm it is inverting.
+  \item \textbf{Step-specific locators}---spatial eigenmodes that fire for
+    specific tableau cell positions $(r, c)$.
+  \item \textbf{Burge rule features}---algebraic eigenmodes encoding the local
+    recurrence $G(i,j) = \max(G(i{-}1,j),\, G(i,j{-}1)) - G(i{-}1,j{-}1) + a_{ij}$.
+\end{itemize}
+
+These are not abstract directions requiring post hoc interpretation---they are
+recognisable steps of known algorithms, recovered as the natural basis of the
+network's internal representation.
+
+\subsection{Algorithmic generalisation as resonance}
+
+Training on only 0.00004\% of $S_{15}$ yields 99.99\% exact-match accuracy on
+held-out data. In the Green's function picture, this is expected: you do not
+need to strike a drum at every point to determine its eigenmodes. A sparse set
+of impulses suffices to identify the spectral structure, because each
+eigenfunction is defined over the entire domain. Once the modes are
+learned, any input decomposes into the same basis.
+
+The MLP baseline collapses from 95.67\% at $n = 10$ to 3.07\% at $n = 15$:
+an MLP has no spatial structure to support extended eigenmodes. It is a lookup
+table pretending to be a drum.
+
+\subsection{The RSK transformer as an integrable system}
+
+In the framework developed above, the RSK transformer sits in the
+\emph{integrable} regime. The evidence:
+\begin{itemize}[leftmargin=*]
+  \item The SAE decomposition is global: the same features work across the
+    entire input space ($S_{15}$). There is no polysemanticity---each feature
+    has one meaning everywhere. The presheaf is a sheaf. $H^1 = 0$.
+  \item 100\% accuracy means the spectral decomposition is complete: no
+    information is lost in the radiation/residual.
+  \item The ablation study shows what happens when you \emph{break} the
+    sheaf structure: removing geometric information (the domain topology)
+    introduces curvature into the representation, forces polysemanticity,
+    and accuracy degrades.
+  \item The MLP baseline is a non-integrable system: no spatial structure
+    to support coherent modes, high effective $H^1$, poor generalisation.
+\end{itemize}
+
+The RSK transformer offers a laboratory for the spectral theory of neural
+networks precisely because it is small enough to be fully interpretable yet
+rich enough to learn deep algebraic structure---and integrable enough that the
+full spectral picture is accessible.
+
+\section{Conclusion: The Three Levels}
+
+The spectral theory of LLMs has three levels, each answering a question the
+previous cannot:
+
+\medskip
+\begin{center}
+\renewcommand{\arraystretch}{1.3}
+\begin{tabular}{@{}llll@{}}
+\toprule
+\textbf{Level} & \textbf{Mathematics} & \textbf{LLM tool} & \textbf{What it explains} \\
+\midrule
+1. Linear & Green's functions & PCA & Natural modes exist \\
+2. Nonlinear & Inverse Scattering & SAEs & Hidden linearity in nonlinear systems \\
+3. Global & Sheaf cohomology & $H^1$ analysis & Why local decompositions fail globally \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\medskip
+At Level~1, the LLM is a drum. Prompts excite its natural frequencies. This is
+true, useful, and incomplete.
+
+At Level~2, the drum is nonlinear---but ``nonlinear'' is a property of the
+coordinates, not the physics. SAEs find the scattering-data basis in which the
+representation becomes diagonal. Solitons survive collisions because eigenvalues
+are invariants; monosemantic features persist across layers for the same reason.
+
+At Level~3, we confront the global question. Local linearisations exist on
+competence patches, but they may not glue. Polysemanticity is the cohomological
+obstruction. The dimension of $H^1$ measures how context-dependent the model's
+representations truly are---and whether that context-dependence is a defect to
+be repaired or a compression strategy to be understood.
+
+An LLM is not a machine that follows instructions. It is a medium with a
+physics---and that physics has a spectral theory.
+
+\begin{thebibliography}{9}
+\bibitem{rsk-transformer}
+R.~Langer.
+\emph{RSK Transformer: Learning inverse combinatorial bijections}.
+\url{https://huggingface.co/RobBobin/rsk-transformer}, 2025.
+
+\bibitem{kac1966}
+M.~Kac.
+Can one hear the shape of a drum?
+\emph{The American Mathematical Monthly}, 73(4):1--23, 1966.
+
+\end{thebibliography}
+
+\end{document}

@@ -1,0 +1,592 @@
+\documentclass[11pt,a4paper]{article}
+\usepackage[margin=2.5cm]{geometry}
+\usepackage{amsmath,amssymb,amsthm}
+\usepackage{xcolor}
+\usepackage{booktabs}
+\usepackage{enumitem}
+\usepackage{hyperref}
+\hypersetup{colorlinks=true, linkcolor=blue!60!black, urlcolor=blue!60!black, citecolor=blue!60!black}
+
+\usepackage{titlesec}
+\titleformat{\section}{\large\bfseries}{\thesection.}{0.5em}{}
+\titleformat{\subsection}{\normalsize\bfseries}{\thesubsection.}{0.5em}{}
+
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{6pt}
+
+\title{\textbf{The Laplace--Beltrami Operator on Hurwitz\\
+and Hurwitz-like Surfaces}\\[4pt]
+\large Spectral Gaps, Representation Theory, and Topological Constraints}
+\author{Robin Langer}
+\date{}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+The Laplace--Beltrami operator on a compact hyperbolic Riemann surface encodes
+three things simultaneously: the geometry (curvature, metric), the topology
+(genus, handles), and the symmetry (automorphism group). Its eigenvalues are
+the natural frequencies of the surface; its eigenspaces are irreducible
+representations of the symmetry group; and its first cohomology measures the
+topological obstructions that no amount of geometric deformation can remove.
+We survey this structure on a family of hyperbolic surfaces arising as quotients
+of the hyperbolic plane by triangle groups---the Bolza surface (genus~2,
+$\Delta(2,3,8)$, $\mathrm{GL}(2,\mathbb{F}_3)$), the Klein quartic (genus~3,
+$\Delta(2,3,7)$, $\mathrm{PSL}(2,7)$), and the Macbeath surface (genus~7,
+$\Delta(2,3,7)$, $\mathrm{PSL}(2,8)$)---and discuss the tension between
+maximising symmetry and maximising spectral gap. Companion code computing the
+cell complexes, homology, and group representations is included.
+\end{abstract}
+
+\section{Motivation: From LLMs to Hyperbolic Surfaces}
+
+This paper is a companion to \emph{LLMs as Resonant Structures}~\cite{langer2026llm},
+which develops a spectral theory of large language models in three layers:
+Green's functions (linear spectral decomposition), the Inverse Scattering
+Transform (nonlinear spectral decomposition via sparse autoencoders), and
+sheaf theory (the global obstruction to interpretability).
+
+The sheaf-theoretic layer raises a concrete mathematical question. If one treats
+the LLM's latent space as a Riemannian manifold $M$, then local linearisations
+(SAE decompositions that work in a neighbourhood of input space) form a
+\emph{presheaf} on $M$. Polysemanticity---the phenomenon where a single feature
+means different things in different contexts---is the failure of the gluing
+axiom: the presheaf is not a sheaf. The first \v{C}ech cohomology $H^1(M, \mathcal{F})$
+measures the degree of this failure.
+
+The natural next question is: \emph{how much of $H^1$ is topologically forced?}
+If the manifold $M$ has nontrivial topology (handles, genus), then Gauss--Bonnet
+and Hodge theory guarantee that $H^1 \neq 0$ regardless of the metric---no
+training objective can eliminate it. The Laplace--Beltrami operator
+$\Delta_g$ on $M$ is the bridge between the topology ($H^1$), the geometry
+(curvature, holonomy), and the representation theory (how the symmetry group
+organises the eigenspaces).
+
+I should be honest about what I don't know. My background is in symmetric graphs
+and symmetric polynomials---algebraic combinatorics, not differential geometry.
+I view everything through the lens of symmetry. I do not have working
+intuition for the Laplace--Beltrami operator, and this paper is my attempt to
+build some.
+
+The surfaces studied here---the Bolza surface, the Klein quartic, the Macbeath
+surface---were not chosen because they are the right model for an LLM's latent
+manifold. They were chosen because I already know how to compute with them.
+In prior work on quantum error-correcting codes~\cite{langer2026css}, I
+formalised in Lean~4 the fact that a CSS code constructed from a surface tiling
+encodes exactly $2g$ logical qubits, where $g$ is the genus. The chain complex
+condition $\partial^2 = 0$ (which gives the orthogonality of X and Z
+stabilizers) and the first Betti number $\beta_1 = 2g$ (which counts the
+logical qubits) are the same $H^1$ that appears in the sheaf-theoretic picture
+of polysemanticity. These surfaces are the manifolds for which I have explicit
+cell complexes, boundary maps, cohomology computations, and
+representation-theoretic decompositions already in hand.
+
+The important caveat is that optimising for symmetry---which is what makes these
+surfaces tractable---is \emph{not} the same as optimising for the quantities
+that matter in the LLM setting. The Laplace--Beltrami training objective
+proposed by Poole~\cite{poole2026}---minimising holonomy to make multi-agent
+representations locally and globally flat---optimises for \emph{geometric}
+flatness, not algebraic structure. Symmetry constrains the eigenspaces;
+flatness constrains the eigenvalues. As we shall see, these pull in opposite
+directions (Section~6). Nevertheless, highly symmetric surfaces make good
+starting examples precisely because they are the ``spherical cows'' of
+Riemannian spectral theory: simplified enough to compute with, structured enough
+to reveal the essential trade-offs.
+
+The results suggest that:
+
+\begin{itemize}[leftmargin=*]
+  \item The spectral gap $\lambda_1$ controls robustness: how resistant the
+    surface is to low-frequency perturbations (analogous to prompt sensitivity
+    in an LLM).
+  \item Eigenspace multiplicities, forced by irreducible representations of the
+    symmetry group, determine feature granularity (analogous to the resolution
+    of SAE features).
+  \item $H^1 = \mathbb{R}^{2g}$ is a topological invariant: the number of
+    ``polysemantic handles'' that no amount of training can flatten---and, in the
+    quantum coding setting, the number of logical qubits protected by the code.
+  \item Maximising symmetry (Hurwitz surfaces) and maximising spectral gap
+    (robustness) are in tension---a trade-off between interpretability and
+    stability that may have a direct analogue in LLM design.
+\end{itemize}
+
+\section{Triangle Groups and Hyperbolic Surfaces}
+
+A triangle group $\Delta(p,q,r) = \langle a, b \mid a^p = b^q = (ab)^r = 1 \rangle$
+with $1/p + 1/q + 1/r < 1$ acts on the hyperbolic plane $\mathbb{H}^2$ by
+isometries, tiling it with hyperbolic triangles of angles $\pi/p$, $\pi/q$,
+$\pi/r$. If $G$ is a finite group admitting a surjection
+$\Delta(p,q,r) \twoheadrightarrow G$ with torsion-free kernel
+$\Gamma \trianglelefteq \Delta$, then the quotient
+\[
+  S = \mathbb{H}^2 / \Gamma
+\]
+is a compact Riemann surface with $\mathrm{Aut}(S) \supseteq G$ and genus
+determined by the Riemann--Hurwitz formula:
+\[
+  |G| = \frac{4\pi(g - 1)}{2\pi\left(1 - \frac{1}{p} - \frac{1}{q} - \frac{1}{r}\right)}
+  = \frac{2(g-1)}{1 - 1/p - 1/q - 1/r}.
+\]
+
+The \emph{Hurwitz bound} states that $|\mathrm{Aut}(S)| \leq 84(g-1)$ for
+genus $g \geq 2$, achieved precisely when the triangle group is $\Delta(2,3,7)$
+(since $1 - 1/2 - 1/3 - 1/7 = 1/42$ gives $|G| = 84(g-1)$). Surfaces
+achieving this bound are called \emph{Hurwitz surfaces}.
+
+\subsection{The family}
+
+We study three surfaces, listed with their triangle group data:
+
+\medskip
+\begin{center}
+\renewcommand{\arraystretch}{1.3}
+\begin{tabular}{@{}lccccl@{}}
+\toprule
+\textbf{Surface} & \textbf{Genus} & $\Delta(p,q,r)$ & $|\mathrm{Aut}|$
+  & \textbf{Hurwitz?} & \textbf{Group} \\
+\midrule
+Bolza & 2 & $(2,3,8)$ & 48 & No (max is 84) & $\mathrm{GL}(2, \mathbb{F}_3)$ \\
+Klein quartic & 3 & $(2,3,7)$ & 168 & Yes ($= 84 \cdot 2$) & $\mathrm{PSL}(2,7)$ \\
+Macbeath & 7 & $(2,3,7)$ & 504 & Yes ($= 84 \cdot 6$) & $\mathrm{PSL}(2,8)$ \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\medskip
+The Bolza surface is the most symmetric genus-2 surface but falls short of the
+Hurwitz bound: $48 < 84$. The Klein quartic is the smallest Hurwitz surface;
+the Macbeath surface is the next. Each carries a regular tessellation inherited
+from the triangle tiling of $\mathbb{H}^2$: the Bolza surface has a
+$\{3,8\}$ triangulation (16 triangles, 6 vertices of valence~8) dual to a
+$\{8,3\}$ octagonal tiling, while the Klein quartic has a $\{3,7\}$
+triangulation dual to the famous $\{7,3\}$ heptagonal tiling.
+
+\section{The Laplace--Beltrami Operator}
+
+Equip each surface $S$ with its constant-curvature $-1$ hyperbolic metric. The
+Laplace--Beltrami operator $\Delta_g$ is defined in local coordinates by
+\[
+  \Delta_g f = \frac{1}{\sqrt{|g|}} \sum_{i,j}
+    \partial_i \left( \sqrt{|g|}\, g^{ij}\, \partial_j f \right),
+\]
+where $g_{ij}$ is the metric tensor and $g^{ij}$ its inverse. This generalises
+the flat Laplacian $\partial^2/\partial x^2 + \partial^2/\partial y^2$ to
+curved surfaces. On a compact surface without boundary, $\Delta_g$ has a
+discrete spectrum:
+\[
+  0 = \lambda_0 < \lambda_1 \leq \lambda_2 \leq \lambda_3 \leq \cdots \to \infty.
+\]
+
+The eigenfunctions $\varphi_n$ satisfying $\Delta_g \varphi_n = -\lambda_n \varphi_n$
+are the natural vibration modes of the surface---the hyperbolic analogues of
+$\sin(nx)$ and $\cos(nx)$ on a circle.
+
+\subsection{What the spectrum encodes}
+
+\textbf{The spectral gap $\lambda_1$.} The first nontrivial eigenvalue controls
+how quickly local perturbations dissipate across the surface. A large spectral
+gap means the surface is ``well-mixed''---perturbations cannot remain localised.
+A small gap means the surface has near-disconnected regions.
+
+\textbf{The area.} Fixed by Gauss--Bonnet: $\mathrm{Area}(S) = 4\pi(g-1)$.
+A genus-2 surface has area $4\pi$; genus~7 has area $24\pi$.
+
+\textbf{The Yang--Yau bound.} An upper bound on $\lambda_1$:
+\[
+  \lambda_1 \leq \frac{8\pi(\lfloor g/2 \rfloor + 1)}{\mathrm{Area}(S)}
+  = \frac{2(\lfloor g/2 \rfloor + 1)}{g - 1}.
+\]
+For genus~2: $\lambda_1 \leq 4$. For genus~3: $\lambda_1 \leq 8/3 \approx 2.67$.
+For genus~7: $\lambda_1 \leq 4/3 \approx 1.33$.
+
+\textbf{The Selberg bound.} For arithmetic hyperbolic surfaces (quotients by
+arithmetic lattices), Selberg conjectured $\lambda_1 \geq 1/4$. The current best
+result is $\lambda_1 \geq 975/4096 \approx 0.238$ (Kim--Sarnak). For random
+hyperbolic surfaces of large genus, $\lambda_1 \to 1/4$ almost surely
+(Brooks--Makover). So $1/4$ is the ``generic'' spectral gap.
+
+\section{The Bolza Surface}
+
+The Bolza surface $B$ is defined algebraically by $y^2 = x^5 - x$, with
+automorphism group $\mathrm{GL}(2, \mathbb{F}_3)$ of order~48. Its fundamental
+domain is a regular hyperbolic octagon with vertex angles $\pi/4$ (so that
+$8 \times \pi/4 = 2\pi$ at each vertex). The octagon's sides are identified
+in pairs according to the standard genus-2 surface word $aba^{-1}b^{-1}cdc^{-1}d^{-1}$.
+
+\subsection{The spectrum}
+
+The first several eigenvalues, computed numerically by
+Strohmaier--Uski~\cite{strohmaier2013} and Cook~\cite{cook2018}, are:
+
+\medskip
+\begin{center}
+\renewcommand{\arraystretch}{1.3}
+\begin{tabular}{@{}ccl@{}}
+\toprule
+$\lambda_n$ (approx) & Multiplicity & Eigenspace structure \\
+\midrule
+0 & 1 & Trivial representation \\
+3.839 & 2 & 2-dimensional irrep of $\mathrm{GL}(2, \mathbb{F}_3)$ \\
+5.354 & 3 & 3-dimensional irrep \\
+8.250 & 3 & 3-dimensional irrep \\
+14.72 & 2 & 2-dimensional irrep \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\medskip
+The spectral gap $\lambda_1 \approx 3.84$ is conjectured to be maximal among
+all genus-2 hyperbolic surfaces. The Yang--Yau bound gives $\lambda_1 \leq 4$,
+so the Bolza surface achieves 96\% of the theoretical maximum. This is far
+above the Selberg baseline of $1/4$: the Bolza surface is a spectral outlier,
+extraordinarily well-mixed for its genus.
+
+\subsection{Representation-theoretic structure}
+
+The group $\mathrm{GL}(2, \mathbb{F}_3)$ has order $48 = (9-1)(9-3)$. Its
+irreducible representations over $\mathbb{R}$ include representations of
+dimensions 1, 2, 3, and higher. The eigenspaces of $\Delta_g$ must be
+$\mathrm{GL}(2, \mathbb{F}_3)$-representations, so they decompose into
+direct sums of irreps.
+
+The first nontrivial eigenspace at $\lambda_1 \approx 3.84$ is 2-dimensional:
+the smallest nontrivial irrep. This means you cannot have a single
+eigenfunction at $\lambda_1$---the symmetry group acts on it and generates
+a 2-dimensional orbit. The symmetry forces eigenfunctions into multiplets.
+
+\subsection{Cohomology and the $(2,3,8)$ triangle group}
+
+The Bolza surface arises from the exact sequence
+$1 \to \Gamma \to \Delta(2,3,8) \to \mathrm{GL}(2,\mathbb{F}_3) \to 1$
+where $\Gamma$ is a torsion-free Fuchsian group (the fundamental group
+$\pi_1(B)$). The cell complex inherited from the $(2,3,8)$ tiling gives:
+
+\begin{itemize}[leftmargin=*]
+  \item $\{3,8\}$ triangulation: 16 triangles, 24 edges, 6 vertices (valence 8)
+  \item $\{8,3\}$ dual: 6 octagons, 24 edges, 16 vertices (valence 3)---the
+    dual graph is the M\"{o}bius--Kantor graph
+  \item $\chi = 6 - 24 + 16 = -2$, confirming genus~2
+\end{itemize}
+
+The cellular homology gives Betti numbers $\beta_0 = 1$, $\beta_1 = 4 = 2g$,
+$\beta_2 = 1$, confirming $H^1(B, \mathbb{R}) \cong \mathbb{R}^4$.
+The $\mathrm{GL}(2,\mathbb{F}_3)$-action on $H^1$ decomposes as
+$V_2 \oplus \overline{V}_2$: a conjugate pair of 2-dimensional irreps
+(see \texttt{bolza-surface/bolza\_cohomology.py} for the computation).
+
+\section{The Klein Quartic}
+
+The Klein quartic is the genus-3 Riemann surface defined by
+$x^3 y + y^3 z + z^3 x = 0$ in $\mathbb{P}^2$, with automorphism group
+$\mathrm{PSL}(2,7)$ of order~168. It is the smallest Hurwitz surface:
+$168 = 84(3-1)$.
+
+\subsection{The $(2,3,7)$ triangle group}
+
+The Klein quartic arises from
+$1 \to \Gamma \to \Delta(2,3,7) \to \mathrm{PSL}(2,7) \to 1$.
+The triangle tiling of $\mathbb{H}^2$ by $(2,3,7)$ triangles descends to:
+
+\begin{itemize}[leftmargin=*]
+  \item $\{3,7\}$ triangulation: 56 triangles, 84 edges, 24 vertices (valence 7)
+  \item $\{7,3\}$ dual: 24 heptagons, 84 edges, 56 vertices (valence 3)
+  \item $\chi = 24 - 84 + 56 = -4$, confirming genus~3
+\end{itemize}
+
+This is the famous heptagonal tiling depicted in countless illustrations of
+hyperbolic geometry. The 24 heptagons tile the genus-3 surface with 3 meeting
+at each vertex.
+
+\subsection{Representation theory of $\mathrm{PSL}(2,7)$}
+
+$\mathrm{PSL}(2,7)$ has 6 conjugacy classes and irreducible representations of
+dimensions $1, 3, \overline{3}, 6, 7, 8$. The cohomology decomposes as
+\[
+  H^1(\text{Klein}, \mathbb{R}) \cong \mathbb{R}^6 \cong V_3 \oplus \overline{V}_3,
+\]
+a conjugate pair of 3-dimensional irreps
+(see \texttt{klein-quartic/klein\_quartic\_cohomology.py}). This is the
+representation-theoretic signature of a Hurwitz surface: the cohomology is forced
+into the smallest nontrivial irreps of the automorphism group.
+
+\subsection{Spectral consequences of Hurwitz symmetry}
+
+Because $\mathrm{PSL}(2,7)$ has no 2-dimensional irreps, the first nontrivial
+eigenspace of $\Delta_g$ on the Klein quartic must be at least
+3-dimensional---the smallest nontrivial irrep available. This is a direct
+consequence of the Hurwitz bound: maximum symmetry forces the eigenspaces into
+\emph{larger} multiplets.
+
+Combined with the Yang--Yau bound $\lambda_1 \leq 8/3$ for genus~3,
+this constrains the spectrum tightly. The Klein quartic cannot have a spectral
+gap as large as the Bolza surface ($\lambda_1 \leq 2.67$ vs.\ the Bolza's
+$\lambda_1 \approx 3.84$), but its eigenspaces are more highly structured.
+
+\section{The Macbeath Surface}
+
+The Macbeath surface is the genus-7 Hurwitz surface with automorphism group
+$\mathrm{PSL}(2,8)$ of order $504 = 84 \cdot 6$. It arises from the same
+$(2,3,7)$ triangle group as the Klein quartic, but with a different
+(larger) quotient.
+
+\subsection{Representation theory of $\mathrm{PSL}(2,8)$}
+
+$\mathrm{PSL}(2,8)$ has 9 conjugacy classes with irreducible representations of
+dimensions $1, 7, 7, 7, 8, 8, 8, 9, 9$. Notably, the smallest nontrivial
+irrep is 7-dimensional. This forces each nontrivial eigenspace of $\Delta_g$ to
+have dimension at least~7.
+
+The cohomology is $H^1 \cong \mathbb{R}^{14}$, and it decomposes into
+$\mathrm{PSL}(2,8)$-irreps. The 14-dimensional $H^1$ provides 14 independent
+topological obstructions---14 independent directions in which local frames
+cannot be made globally compatible.
+
+\subsection{The spectral gap shrinks}
+
+The Yang--Yau bound for genus~7 is $\lambda_1 \leq 4/3 \approx 1.33$. Combined
+with eigenspaces of dimension $\geq 7$, the Macbeath surface has a coarser
+spectral resolution than either the Bolza or Klein surfaces: fewer distinct
+eigenvalues in any given range, each with high multiplicity.
+
+\section{The Hurwitz Paradox: Symmetry vs.\ Spectral Gap}
+
+\subsection{The tension}
+
+Comparing the three surfaces reveals a fundamental tension:
+
+\medskip
+\begin{center}
+\renewcommand{\arraystretch}{1.3}
+\begin{tabular}{@{}lccccc@{}}
+\toprule
+\textbf{Surface} & $g$ & $|\mathrm{Aut}|$ & Hurwitz?
+  & $\lambda_1$ bound & Min eigenspace dim \\
+\midrule
+Bolza & 2 & 48 & No & $\leq 4$ & 2 \\
+Klein & 3 & 168 & Yes & $\leq 2.67$ & 3 \\
+Macbeath & 7 & 504 & Yes & $\leq 1.33$ & 7 \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\medskip
+More symmetry means:
+\begin{itemize}[leftmargin=*]
+  \item Larger minimum eigenspace dimensions (eigenspaces must be full irreps)
+  \item A lower upper bound on $\lambda_1$ (via Yang--Yau, since genus grows with symmetry)
+  \item Coarser spectral resolution (fewer distinct eigenvalues, each highly degenerate)
+\end{itemize}
+
+Less symmetry means:
+\begin{itemize}[leftmargin=*]
+  \item Smaller eigenspace dimensions (finer-grained modes)
+  \item A potentially larger spectral gap (the Bolza surface nearly saturates Yang--Yau)
+  \item More distinct eigenvalues in any given spectral range
+\end{itemize}
+
+\subsection{Symmetry maximises structure; spectral gap maximises mixing}
+
+The Hurwitz bound $84(g-1)$ maximises the number of symmetries a surface of
+genus $g$ can carry. But maximising symmetry is not the same as maximising the
+spectral gap. The Bolza surface has less symmetry than the Hurwitz bound
+allows, but it has the largest spectral gap of any genus-2 surface.
+
+The two criteria optimise different things:
+\begin{itemize}[leftmargin=*]
+  \item \textbf{Symmetry (Hurwitz)} $\to$ the eigenspaces are maximally
+    constrained by representation theory $\to$ the spectral structure is most
+    ``interpretable'' (fewest free parameters, everything determined by group theory).
+  \item \textbf{Spectral gap} $\to$ perturbations dissipate maximally fast
+    $\to$ the surface is most ``robust'' (hardest to excite nontrivial modes).
+\end{itemize}
+
+These are in tension because achieving the Hurwitz bound requires genus to grow
+(for larger groups), which pushes the Yang--Yau bound down and forces the
+spectral gap to shrink.
+
+\section{Topological Constraints: Why Curvature Cannot Be Eliminated}
+
+\subsection{Gauss--Bonnet}
+
+On any compact surface of genus $g \geq 2$ with constant curvature $K = -1$:
+\[
+  \int_S K\, dA = 2\pi\chi(S) = 4\pi(1 - g).
+\]
+The total curvature is a topological invariant. You can redistribute curvature
+(make some regions flatter and others more curved), but you cannot eliminate it.
+The negative curvature is topologically forced.
+
+\subsection{$H^1$ and the handles}
+
+The first cohomology $H^1(S, \mathbb{R}) \cong \mathbb{R}^{2g}$ records the
+topological obstructions. Each handle of the surface contributes two
+independent directions to $H^1$, and each direction represents a way in which
+parallel transport around a non-contractible loop can fail to return a vector
+to its starting orientation.
+
+\medskip
+\begin{center}
+\renewcommand{\arraystretch}{1.3}
+\begin{tabular}{@{}lccl@{}}
+\toprule
+\textbf{Surface} & Genus & $\dim H^1$ & $H^1$ as Aut-representation \\
+\midrule
+Bolza & 2 & 4 & $V_2 \oplus \overline{V}_2$ under $\mathrm{GL}(2,\mathbb{F}_3)$ \\
+Klein & 3 & 6 & $V_3 \oplus \overline{V}_3$ under $\mathrm{PSL}(2,7)$ \\
+Macbeath & 7 & 14 & Irreps of $\mathrm{PSL}(2,8)$ \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\medskip
+The pattern is clear: $H^1$ always decomposes into conjugate pairs of the
+\emph{smallest} nontrivial irreps of the automorphism group. For the Bolza
+surface, the smallest is 2-dimensional; for the Klein quartic,
+3-dimensional; for Macbeath, the 7-dimensional irreps. The topology forces $H^1$
+to fill out complete irreducible representations---it cannot be ``half'' of an
+irrep.
+
+\subsection{Holonomy as parallel transport failure}
+
+The holonomy group of a Riemannian manifold measures what happens when you
+parallel-transport a tangent vector around a closed loop. On a flat manifold,
+the vector returns unchanged (trivial holonomy). On a curved manifold, it
+returns rotated.
+
+On a genus-$g$ surface with constant curvature $-1$, the holonomy around the
+$2g$ generators of $\pi_1(S)$ is nontrivial. These are the ``handles'' of
+the surface, and the holonomy around each handle is determined by the
+hyperbolic translation length of the corresponding element of the Fuchsian
+group $\Gamma$.
+
+Trivial holonomy would require the surface to be flat---but Gauss--Bonnet
+forbids this for $g \geq 2$. The holonomy is therefore topologically forced:
+a consequence of the genus, not a failure of optimisation.
+
+\section{Eigenfunctions as Irreducible Representations}
+
+\subsection{The general principle}
+
+If a group $G$ acts on a Riemannian manifold $S$ by isometries, then $G$ acts on
+each eigenspace $E_\lambda = \{f : \Delta_g f = -\lambda f\}$. By Schur's lemma,
+$E_\lambda$ decomposes into a direct sum of irreducible $G$-representations:
+\[
+  E_\lambda \cong \bigoplus_i V_{\rho_i}^{\oplus m_i}.
+\]
+The multiplicities $m_i$ are the Fourier coefficients of the spectral
+decomposition with respect to the representation ring of $G$.
+
+This means:
+\begin{itemize}[leftmargin=*]
+  \item Each eigenvalue ``carries'' one or more irreps of the symmetry group.
+  \item The minimum eigenspace dimension equals the dimension of the smallest
+    irrep that appears at that eigenvalue.
+  \item Two eigenvalues can only be equal if their eigenspaces merge into a
+    single (larger) $G$-representation.
+\end{itemize}
+
+\subsection{Consequences for spectral resolution}
+
+A group with large minimum irrep dimension forces coarse spectral resolution.
+$\mathrm{PSL}(2,8)$ has minimum nontrivial irrep dimension~7, so the Macbeath
+surface cannot have an eigenspace smaller than 7-dimensional (apart from
+the trivial eigenvalue $\lambda_0 = 0$). In contrast,
+$\mathrm{GL}(2,\mathbb{F}_3)$ has a 2-dimensional irrep, so the Bolza surface
+can have eigenspaces as small as 2-dimensional.
+
+This is a direct trade-off: more symmetry buys you more algebraic structure
+(the eigenspaces are determined by representation theory), but at the cost of
+spectral resolution (each eigenvalue accounts for more dimensions). The
+``finest-grained'' spectral analysis is available on the least symmetric surfaces.
+
+\section{Conclusion}
+
+The Laplace--Beltrami operator on a compact hyperbolic surface is the nexus
+where topology, geometry, and representation theory meet:
+
+\medskip
+\begin{center}
+\renewcommand{\arraystretch}{1.3}
+\begin{tabular}{@{}ll@{}}
+\toprule
+\textbf{Property} & \textbf{What it determines} \\
+\midrule
+$\lambda_1$ (spectral gap) & Mixing rate; robustness to perturbation \\
+Eigenspace dimensions & Forced by irreps of $\mathrm{Aut}(S)$ \\
+$H^1 \cong \mathbb{R}^{2g}$ & Topological obstructions (handles) \\
+$H^1$ as $\mathrm{Aut}$-rep & How symmetry organises the obstructions \\
+Yang--Yau bound & Maximum possible spectral gap for given genus \\
+Selberg bound ($1/4$) & Generic large-genus baseline \\
+Holonomy & Parallel transport failure around handles \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\medskip
+The Hurwitz paradox---that maximising symmetry and maximising spectral gap are
+in tension---reveals that these surfaces optimise different criteria. Hurwitz
+surfaces maximise algebraic structure (the representation theory determines
+everything). Non-Hurwitz surfaces like the Bolza can maximise spectral gap
+(robustness to perturbation) at the cost of less algebraic constraint.
+
+The topological invariant $H^1 = \mathbb{R}^{2g}$, decomposed into irreducible
+representations of the automorphism group, is the fundamental datum: it measures
+what cannot be changed by any geometric deformation, only by changing the
+topology itself. On a genus-$g$ surface, there are exactly $2g$ independent
+directions in which curvature is topologically forced and holonomy is necessarily
+nontrivial. This is a theorem, not an approximation.
+
+\begin{thebibliography}{9}
+\bibitem{langer2026llm}
+R.~Langer.
+\emph{LLMs as Resonant Structures: From Green's Functions to Nonlinear
+Spectral Theory}. 2026.
+
+\bibitem{strohmaier2013}
+A.~Strohmaier and V.~Uski.
+An algorithm for the computation of eigenvalues, spectral zeta functions
+and zeta-determinants on hyperbolic surfaces.
+\emph{Communications in Mathematical Physics}, 317(3):827--869, 2013.
+
+\bibitem{cook2018}
+J.~Cook.
+Properties of eigenvalues on Riemann surfaces with large symmetry groups.
+PhD thesis, Loughborough University, 2018.
+
+\bibitem{kac1966}
+M.~Kac.
+Can one hear the shape of a drum?
+\emph{The American Mathematical Monthly}, 73(4):1--23, 1966.
+
+\bibitem{hurwitz1893}
+A.~Hurwitz.
+\"{U}ber algebraische Gebilde mit eindeutigen Transformationen in sich.
+\emph{Mathematische Annalen}, 41:403--442, 1893.
+
+\bibitem{yang_yau1980}
+P.~C.~Yang and S.-T.~Yau.
+Eigenvalues of the Laplacian of compact Riemann surfaces and minimal submanifolds.
+\emph{Annali della Scuola Normale Superiore di Pisa}, 7(1):55--63, 1980.
+
+\bibitem{selberg1965}
+A.~Selberg.
+On the estimation of Fourier coefficients of modular forms.
+\emph{Proc.\ Symp.\ Pure Math.}, 8:1--15, 1965.
+
+\bibitem{brooks_makover2004}
+R.~Brooks and E.~Makover.
+Random construction of Riemann surfaces.
+\emph{Journal of Differential Geometry}, 68(1):121--157, 2004.
+
+\bibitem{langer2026css}
+R.~Langer.
+\emph{CSS Quantum Codes from Surface Tilings: A Lean~4 Formalisation}.
+2026.
+
+\bibitem{poole2026}
+A.~Poole.
+Personal communication, August 2026.
+\end{thebibliography}
+
+\end{document}
